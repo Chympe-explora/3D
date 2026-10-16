@@ -4,54 +4,303 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Krem Chympe</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root { color-scheme: dark; }
-  html, body {
-    margin: 0;
-    background: #05080f;
-    color: #f3efe6;
-    font-family: 'Cormorant Garamond', Georgia, serif;
-  }
-  .text {
-    position: fixed;
-    left: 0; right: 0;
-    text-align: center;
-    padding: 0 24px;
-    box-sizing: border-box;
-    pointer-events: none;
-  }
+  html, body { margin: 0; background: #05080f; color: #f3efe6;
+    font-family: 'Cormorant Garamond', Georgia, serif; }
+  #globe { position: fixed; inset: 0; width: 100%; height: 100%; }
+
+  /* photo scenes */
+  .photo { position: fixed; inset: 0; opacity: 0; background-size: cover;
+    background-position: center; will-change: opacity, transform; }
+  .shade { position: fixed; inset: 0; pointer-events: none;
+    background: linear-gradient(transparent 55%, rgba(0,0,0,.65)); }
+
+  /* text layers */
+  .text { position: fixed; left: 0; right: 0; text-align: center;
+    padding: 0 24px; box-sizing: border-box; pointer-events: none;
+    transition: opacity .4s ease; }
   #title { top: calc(11vh + env(safe-area-inset-top, 0px)); }
-  #title h1 {
-    margin: 0;
-    font-weight: 500;
-    letter-spacing: .04em;
-    font-size: clamp(46px, 13vw, 120px);
-    line-height: 1;
-  }
-  #title p {
-    font-family: system-ui, sans-serif;
-    line-height: 1.5;
-    margin: 14px auto 0;
-    max-width: 32ch;
-    font-size: clamp(13px, 3.6vw, 17px);
-  }
-  #cue {
-    bottom: calc(5vh + env(safe-area-inset-bottom, 0px));
-    font: 12px system-ui, sans-serif;
-    letter-spacing: .2em;
-    opacity: .7;
-  }
+  #title h1 { margin: 0; font-weight: 500; letter-spacing: .04em;
+    font-size: clamp(46px, 13vw, 120px); line-height: 1; }
+  #title p, #caption p { font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.55; margin: 14px auto 0; max-width: 32ch;
+    font-size: clamp(13px, 3.6vw, 17px); opacity: .85; }
+  #cue { bottom: calc(5vh + env(safe-area-inset-bottom, 0px));
+    font: 11px 'Inter', system-ui, sans-serif; letter-spacing: .22em;
+    opacity: .7; }
+  #caption { bottom: calc(9vh + env(safe-area-inset-bottom, 0px)); opacity: 0; }
+  #caption h2 { margin: 0; font-weight: 500; line-height: 1.05;
+    font-size: clamp(34px, 9vw, 68px); text-shadow: 0 2px 24px #000; }
+
+  /* marker */
+  #marker { position: fixed; width: 0; height: 0; opacity: 0;
+    pointer-events: none; transition: opacity .3s ease; }
+  #marker i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px;
+    border-radius: 50%; background: #5fd0c4; box-shadow: 0 0 12px #5fd0c4; }
+  #marker b { position: absolute; left: -16px; top: -16px; width: 32px; height: 32px;
+    border-radius: 50%; border: 1.5px solid #5fd0c4; animation: pulse 1.8s infinite; }
+  #marker span { position: absolute; left: 16px; top: -7px;
+    font: 11px 'Inter', system-ui, sans-serif; letter-spacing: .18em;
+    text-transform: uppercase; white-space: nowrap; opacity: .85; }
+  @keyframes pulse { from { transform: scale(.4); opacity: 1 }
+                     to   { transform: scale(1.7); opacity: 0 } }
+
+  /* chapter dots */
+  #dots { position: fixed; right: 18px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 14px; pointer-events: none; z-index: 5; }
+  #dots span { width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(243,239,230,.25); transition: background .3s, transform .3s; }
+  #dots span.active { background: #5fd0c4; transform: scale(1.5); }
+
+  @media (prefers-reduced-motion: reduce) { #marker b { animation: none; } }
 </style>
 </head>
 <body>
 
-<div class="text" id="title">
-  <h1>Krem Chympe</h1>
-  <p>A hidden waterfall in Khaddum village, East Jaintia Hills, Meghalaya, India</p>
-</div>
+<canvas id="globe"></canvas>
+<div id="photos"></div>
+<div class="shade"></div>
 
+<div id="marker"><b></b><i></i><span id="markerLabel"></span></div>
+<div id="dots"></div>
+
+<div class="text" id="title"><h1></h1><p></p></div>
+<div class="text" id="caption"><h2></h2><p></p></div>
 <div class="text" id="cue">SCROLL TO EXPLORE</div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ========== EDIT HERE ========== */
+const CONFIG = {
+  title: "Krem Chympe",
+  subtitle: "A hidden waterfall in Khaddum village, East Jaintia Hills, Meghalaya, India",
+  markerLabel: "Meghalaya",
+  lat: 25.4,
+  lon: 91.9,
+  earthImage: "earth.jpg",
+  // Meghalaya boundary — public GeoJSON (state-level)
+  stateGeoJSON: "https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson",
+  stateName: "Meghalaya",
+  scenes: [
+    { image: "waterfall.jpg", title: "Kremchympe Waterfall",
+      text: "A curtain of water drops into a turquoise pool, hidden in limestone country." },
+    { image: "cave.jpg", title: "The Cave Pool",
+      text: "Deeper in, a bamboo raft drifts on still water beneath the rock." }
+  ]
+};
+/* =============================== */
+
+const RAD = Math.PI / 180;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const ramp = (p, a, b) => smooth((p - a) / (b - a));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// --- text + photos from config ---
+document.querySelector('#title h1').textContent = CONFIG.title;
+document.querySelector('#title p').textContent = CONFIG.subtitle;
+document.getElementById('markerLabel').textContent = CONFIG.markerLabel;
+
+const photoBox = document.getElementById('photos');
+const photos = CONFIG.scenes.map(s => {
+  const d = document.createElement('div');
+  d.className = 'photo';
+  d.style.backgroundImage = `url(${s.image})`;
+  photoBox.appendChild(d);
+  return d;
+});
+
+// --- chapter dots ---
+const dotsBox = document.getElementById('dots');
+const dots = CONFIG.scenes.map(() => {
+  const s = document.createElement('span');
+  dotsBox.appendChild(s);
+  return s;
+});
+
+// very tall page so scroll drives everything
+document.body.style.height = (300 + CONFIG.scenes.length * 200) + 'vh';
+
+// --- three.js ---
+const canvas = document.getElementById('globe');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+
+const tex = new THREE.TextureLoader().load(CONFIG.earthImage, update);
+if ('encoding' in tex) tex.encoding = THREE.sRGBEncoding;
+
+const group = new THREE.Group();
+const globe = new THREE.Mesh(
+  new THREE.SphereGeometry(1, 64, 64),
+  new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })
+);
+group.add(globe);
+
+// soft blue atmosphere
+group.add(new THREE.Mesh(
+  new THREE.SphereGeometry(1.06, 48, 48),
+  new THREE.ShaderMaterial({
+    transparent: true, side: THREE.BackSide, blending: THREE.AdditiveBlending,
+    vertexShader: 'varying vec3 n; void main(){ n = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: 'varying vec3 n; void main(){ float i = pow(.72 - n.z, 3.); gl_FragColor = vec4(.35,.6,1.,1.)*i; }'
+  })
+));
+
+scene.add(group);
+
+// stars
+const starPos = new Float32Array(1800 * 3).map(() => (Math.random() - 0.5) * 60);
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 0.05, color: 0xffffff, transparent: true, opacity: .8 })));
+
+// light
+const sun = new THREE.DirectionalLight(0xfff2d8, 2.2);
+sun.position.set(-2, 2, 3);
+scene.add(sun, new THREE.AmbientLight(0x8aa0c8, 0.9));
+
+// marker point on sphere
+const markerPoint = new THREE.Vector3(
+  Math.cos(CONFIG.lat * RAD) * Math.cos(CONFIG.lon * RAD),
+  Math.sin(CONFIG.lat * RAD),
+  -Math.cos(CONFIG.lat * RAD) * Math.sin(CONFIG.lon * RAD)
+);
+
+// --- Meghalaya state outline ---
+const outlineGroup = new THREE.Group();
+group.add(outlineGroup);
+let outlineReady = false;
+
+fetch(CONFIG.stateGeoJSON)
+  .then(r => r.json())
+  .then(geo => {
+    const features = geo.features || geo.type === 'FeatureCollection' ? geo.features : [geo];
+    const match = features.find(f => {
+      const n = (f.properties && (f.properties.NAME_1 || f.properties.ST_NM || f.properties.name || f.properties.NAME)) || '';
+      return n.toLowerCase() === CONFIG.stateName.toLowerCase();
+    });
+    if (!match) return;
+
+    const coords = match.geometry.type === 'MultiPolygon'
+      ? match.geometry.coordinates.flat(1)
+      : match.geometry.coordinates;
+
+    const positions = [];
+    coords.forEach(ring => {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const a = ring[i], b = ring[i + 1];
+        const pa = latLonToVec3(a[1], a[0], 1.003);
+        const pb = latLonToVec3(b[1], b[0], 1.003);
+        positions.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
+      }
+    });
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const line = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+      color: 0x5fd0c4, transparent: true, opacity: 0.9
+    }));
+    outlineGroup.add(line);
+    outlineReady = true;
+    update();
+  })
+  .catch(() => {});
+
+function latLonToVec3(lat, lon, r) {
+  const phi = (90 - lat) * RAD;
+  const theta = (lon + 180) * RAD;
+  return new THREE.Vector3(
+    -r * Math.sin(phi) * Math.cos(theta),
+     r * Math.cos(phi),
+     r * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+function resize() {
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  update();
+}
+addEventListener('resize', resize);
+
+// --- scroll-driven animation ---
+const INTRO_END = 0.2, OUTRO_START = 0.8, OVERLAP = 0.03;
+
+function update() {
+  const p = clamp(scrollY / (document.body.scrollHeight - innerHeight), 0, 1);
+
+  // g: 0 = far Earth, 1 = zoomed to location
+  const g = p < INTRO_END ? smooth(p / INTRO_END)
+          : p < OUTRO_START ? 1
+          : smooth((1 - p) / (1 - OUTRO_START));
+
+  const lon = lerp(40, CONFIG.lon, g), lat = lerp(2, CONFIG.lat, g);
+  globe.rotation.y = (-90 - lon) * RAD;
+  group.rotation.x = lat * RAD;
+  group.position.y = lerp(-1.25, 0, g);
+  camera.position.z = lerp(3.6, 1.55, g);
+
+  // photo scenes across the middle
+  const n = CONFIG.scenes.length;
+  const span = (OUTRO_START - INTRO_END) / n;
+  let best = 0, bestOpacity = 0;
+  photos.forEach((el, i) => {
+    const a = INTRO_END + i * span, b = a + span;
+    const o = ramp(p, a - OVERLAP, a + OVERLAP) * (1 - ramp(p, b - OVERLAP, b + OVERLAP));
+    const t = clamp((p - a) / span, 0, 1);
+    el.style.opacity = o;
+    el.style.transform = `scale(${lerp(1.15, 1.02, t)})`;
+    if (o > bestOpacity) { bestOpacity = o; best = i; }
+  });
+
+  canvas.style.opacity = 1 - bestOpacity;
+
+  // fade in state outline only as we zoom
+  outlineGroup.visible = outlineReady;
+  outlineGroup.children.forEach(l => l.material.opacity = 0.9 * g);
+
+  renderer.render(scene, camera);
+
+  // caption
+  const cap = document.getElementById('caption');
+  cap.style.opacity = clamp(bestOpacity * 2 - 1, 0, 1);
+  cap.querySelector('h2').textContent = CONFIG.scenes[best].title;
+  cap.querySelector('p').textContent = CONFIG.scenes[best].text;
+
+  // title + cue fade as we zoom
+  document.getElementById('title').style.opacity = 1 - clamp(g * 5, 0, 1);
+  document.getElementById('cue').style.opacity = 1 - clamp(g * 10, 0, 1);
+
+  // chapter dots
+  const activeIdx = bestOpacity > 0.3 ? best : -1;
+  dots.forEach((d, i) => d.classList.toggle('active', i === activeIdx));
+
+  // marker screen position
+  const v = markerPoint.clone();
+  globe.localToWorld(v);
+  const facing = v.z > 0 ? 1 : 0;
+  v.project(camera);
+  const m = document.getElementById('marker');
+  m.style.left = ((v.x + 1) / 2 * innerWidth) + 'px';
+  m.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
+  m.style.opacity = facing * ramp(g, 0.15, 0.5) * (1 - ramp(g, 0.92, 1)) * (1 - bestOpacity);
+}
+
+let queued = false;
+addEventListener('scroll', () => {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => { queued = false; update(); });
+}, { passive: true });
+
+resize();
+</script>
 </body>
 </html>
